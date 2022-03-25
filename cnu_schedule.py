@@ -21,7 +21,15 @@ headers = {
 }
 
 
-class CNUCourseAPI:
+class CNUSchedule:
+
+    def get_dynamic_params(self, html):
+        # Find post fields and parse them
+        soup = BeautifulSoup(html.content, 'html.parser')
+        viewstate = urllib.parse.quote(soup.find(id="__VIEWSTATE")["value"], safe='')
+        viewstate_generator = urllib.parse.quote(soup.find(id="__VIEWSTATEGENERATOR")["value"], safe='')
+        event_validation = urllib.parse.quote(soup.find(id="__EVENTVALIDATION")["value"], safe='')
+        return viewstate, viewstate_generator, event_validation
 
     def __init__(self, semester, after2014=True):
         """
@@ -82,18 +90,13 @@ class CNUCourseAPI:
         else:
             startyearlist = "1"
 
-
         # Create our requests session, makes it easier to carry over cookies to next request.
-        session = requests.Session()
+        self.session = requests.Session()
 
         # Generates our cookies and provides viewstate and eventvalidation parameters for next request.
-        response = session.get('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers)
+        response = self.session.get('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers)
 
-        # Find post fields and parse them
-        soup = BeautifulSoup(response.content, 'html.parser')
-        viewstate = urllib.parse.quote(soup.find(id="__VIEWSTATE")["value"], safe='')
-        viewstate_generator = urllib.parse.quote(soup.find(id="__VIEWSTATEGENERATOR")["value"], safe='')
-        event_validation = urllib.parse.quote(soup.find(id="__EVENTVALIDATION")["value"], safe='')
+        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(response)
 
         # Can possibly add these in init header
         interestlist2 = "Any" # Liberal Learning Core, Honors Program or Writing Intensive Course selection
@@ -104,16 +107,38 @@ class CNUCourseAPI:
         headers['referer'] = 'https://navigator.cnu.edu/StudentScheduleofClasses/'
         
         data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={startyearlist}&semesterlist={semesterlist}&Interestlist2={interestlist2}&CourseNumTextbox=&Button1=Search'
-        response = session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
+        response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
+        
         
         # Stop here if you just want schedule html
         print("Successfully grabbed schedule html.")
         with open("schedule.html", "w+", encoding='UTF-8') as file:
             file.write(response.text)
-
-
-    def search():
+        
+        self.interestlist2 = "Any" # Liberal Learning Core, Honors Program or Writing Intensive Course selection
+        self.disciplineslistbox = "All+Courses" # Subject selection (not required)
+        self.semesterlist = semesterlist
+        self.startyearlist = startyearlist
+        self.schedule = BeautifulSoup(response.content, 'html.parser')
+        
+    def search(self, crn=None):
         return None
     
-    def get_csv():
+    def update(self):
+        response = self.session.get('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers)
+
+        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(response)
+
+        headers['cache-control'] = 'max-age=0'
+        headers['content-type'] = 'application/x-www-form-urlencoded'
+        headers['referer'] = 'https://navigator.cnu.edu/StudentScheduleofClasses/'
+        
+        data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={startyearlist}&semesterlist={semesterlist}&Interestlist2={interestlist2}&CourseNumTextbox=&Button1=Search'
+        response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
+        
+    
+        self.schedule = BeautifulSoup(response.content, 'html.parser')
+
+    def get_csv(self, file_directory=""):
+        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(self.schedule.text)
         return None
