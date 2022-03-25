@@ -59,7 +59,7 @@ class CNUCourseAPI:
         elif "summer term 2" in semester.lower():
             term = "32"
 
-        # hacky way to get the first 4 consequtive digits in string
+        # hacky way to get the first 4 consecutive digits in string
         for index, character in enumerate(semester.lower()):
             if (index + 3) <= (len(semester) - 1):
                 if character.isdigit() and semester[index + 1].isdigit() and semester[index + 2].isdigit() and semester[index + 3].isdigit():
@@ -82,7 +82,7 @@ class CNUCourseAPI:
         else:
             startyearlist = "1"
 
-        print(semesterlist, startyearlist)
+
         # Create our requests session, makes it easier to carry over cookies to next request.
         session = requests.Session()
 
