@@ -1,6 +1,8 @@
 import requests
 import urllib.parse
 from bs4 import BeautifulSoup
+import os
+import course
 import time
 import csv
 
@@ -18,6 +20,12 @@ headers = {
     'sec-fetch-user': '?1',
     'sec-fetch-dest': 'document',
     'accept-language': 'en-US,en;q=0.9'
+}
+
+post_headers = {
+    'cache-control': 'max-age=0',
+    'content-type': 'application/x-www-form-urlencoded',
+    'referer': 'https://navigator.cnu.edu/StudentScheduleofClasses/'
 }
 
 
@@ -101,17 +109,18 @@ class CNUSchedule:
         # Can possibly add these in init header
         interestlist2 = "Any" # Liberal Learning Core, Honors Program or Writing Intensive Course selection
         # disciplineslistbox = "All+Courses" # Subject selection (not required)
-
-        headers['cache-control'] = 'max-age=0'
-        headers['content-type'] = 'application/x-www-form-urlencoded'
-        headers['referer'] = 'https://navigator.cnu.edu/StudentScheduleofClasses/'
+        headers.update(post_headers)
         
         data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={startyearlist}&semesterlist={semesterlist}&Interestlist2={interestlist2}&CourseNumTextbox=&Button1=Search'
         response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
-        
-        
+        if response.status_code == 500:
+            raise ValueError("Bad Request, make sure the provided semester exists. If it does, check POST headers.")
+
+        for key in post_headers:
+            headers.pop(key)
+
         # Stop here if you just want schedule html
-        print("Successfully grabbed schedule html.")
+        # print("Successfully grabbed schedule html.")
         with open("schedule.html", "w+", encoding='UTF-8') as file:
             file.write(response.text)
         
@@ -129,16 +138,27 @@ class CNUSchedule:
 
         viewstate, viewstate_generator, event_validation = self.get_dynamic_params(response)
 
-        headers['cache-control'] = 'max-age=0'
-        headers['content-type'] = 'application/x-www-form-urlencoded'
-        headers['referer'] = 'https://navigator.cnu.edu/StudentScheduleofClasses/'
+        headers.update(post_headers)
         
-        data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={startyearlist}&semesterlist={semesterlist}&Interestlist2={interestlist2}&CourseNumTextbox=&Button1=Search'
+        data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={self.startyearlist}&semesterlist={self.semesterlist}&Interestlist2={self.interestlist2}&CourseNumTextbox=&Button1=Search'
         response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
         
+        for key in post_headers:
+            headers.pop(key)
     
         self.schedule = BeautifulSoup(response.content, 'html.parser')
+        
 
     def get_csv(self, file_directory=""):
-        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(self.schedule.text)
-        return None
+        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(str(self.schedule))
+        data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&Button1=+Export+to+Excel+%28CSV%29'
+
+        headers.update(post_headers)
+        
+        response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/socresults.aspx', headers=headers, data=data)
+        with open(os.path.join(file_directory, "schedule.csv"), "wb") as file:
+            for chunk in response:
+                file.write(chunk)
+
+        csv_reader = csv.reader(file)
+        return csv_reader
