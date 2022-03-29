@@ -1,8 +1,10 @@
 import requests
 import urllib.parse
-import os
+import cchardet
+import lxml
 import time
 import csv
+import os
 from bs4 import BeautifulSoup
 from course import Course
 
@@ -31,12 +33,12 @@ post_headers = {
 
 
 class CNUSchedule:
-
-    def get_dynamic_params(self, html):
-        '''
-        '''
-        # Find post fields and parse them
-        soup = BeautifulSoup(html.content, 'html.parser')
+    def get_dynamic_params(self, response):
+        """
+        Gets dynamic POST parameters from a requests response object.
+        """
+        # Find POST fields and parse them.
+        soup = BeautifulSoup(response.content, 'lxml', from_encoding="utf8")
         viewstate = urllib.parse.quote(soup.find(id="__VIEWSTATE")["value"], safe='')
         viewstate_generator = urllib.parse.quote(soup.find(id="__VIEWSTATEGENERATOR")["value"], safe='')
         event_validation = urllib.parse.quote(soup.find(id="__EVENTVALIDATION")["value"], safe='')
@@ -44,10 +46,11 @@ class CNUSchedule:
 
     def __init__(self, semester, after2014=True):
         """
-        Get the current course schedule to be used in subsequent methods
+        Get the current course schedule to be used in subsequent methods.
+        Plan to add additional parameters to narrow search in future and probably make some attributes private.
         :param after2014: (bool) Specifies whether the schedule is before or after 2014, defaults to True
-        :param semester: (str) Specifies the semester to get schedule for. Can pass arguments like "fall 2022", "spring 2021", "2021 fall", ect.
-        :raise: ValueError
+        :param semester: (str) Specifies the semester to get schedule for. Can pass arguments like "fall 2022", "sPrIng 2021", "2021 fall", ect.
+        :raise: ValueError - ValueError is raised if incorrect parameters are passed in.
         :return: None
         """
 
@@ -64,6 +67,7 @@ class CNUSchedule:
             32 - Second summer term
         '''
 
+        start = time.time()
         year = None
         term = None
 
@@ -109,16 +113,17 @@ class CNUSchedule:
 
         viewstate, viewstate_generator, event_validation = self.get_dynamic_params(response)
 
-        # Can possibly add these in init header
+        # Will eventually add these among other search parameters to CNUSchedule constructor.
         interestlist2 = "Any" # Liberal Learning Core, Honors Program or Writing Intensive Course selection
         disciplineslistbox = "All+Courses" # Subject selection (not required)
-        headers.update(post_headers)
+        headers.update(post_headers) # Add POST headers to existing header dictionary.
         
         data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={startyearlist}&semesterlist={semesterlist}&Interestlist2={interestlist2}&CourseNumTextbox=&Button1=Search'
         response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
         if response.status_code == 500:
             raise ValueError("Bad Request, make sure the provided semester exists. If it does, check to see if the POST payload or headers have changed.")
 
+        # Remove POST headers from headers dictionary.
         for key in post_headers:
             headers.pop(key)
         
@@ -126,37 +131,65 @@ class CNUSchedule:
         self.disciplineslistbox = disciplineslistbox
         self.semesterlist = semesterlist
         self.startyearlist = startyearlist
-        self.schedule_html = BeautifulSoup(response.content, 'html.parser')
-        self.courses = []
-        rows = self.schedule_html.find("table").find_all("tr")
-        for row in rows:
-            # A little pre processing to remove the linebreaks and replace them with and.
-            for linebreak in row.find_all("br"):
-                linebreak.replace_with(" and ")
-            self.courses.append(Course(row))
-        
+        self.schedule_response = response
 
-    def search(self, crn=None, course_name=None, ):
+        # end = time.time()
+        # time_elapsed = end - start
+        # print(f"Got HTML schedule in {time_elapsed} seconds.")
+        self.courses = []
+        # start = time.time()
+        schedule_soup = BeautifulSoup(response.content, 'lxml', from_encoding="utf8")
+        # end = time.time()
+        # time_elapsed = end - start
+        # print(f"Created BeautifulSoup object in {time_elapsed} seconds.")
+        rows = schedule_soup.find("table").find_all("tr") # Get all rows in html table
+        for row in rows:
+            # Ensure we are only passing valid rows to our Course constructor.
+            if len(row.find_all('td')) >= 1:
+                # A little pre-processing to remove the linebreaks and replace them with " and ".
+                for linebreak in row.find_all("br"):
+                    linebreak.replace_with(" and ")
+                self.courses.append(Course(row))
+        
+    def search(self, crn=None, course_name=None, course_title=None):
+        """
+        Pending implementation?
+        """
         return None
     
     def update(self):
+        """
+        Update schedule. Will assume the search parameters passed into constructor. Could potentially make this a Course method.
+        """
+        # Reload schedule starting from original search page, this is because cookies may expire before we want to update course schedule.
         response = self.session.get('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers)
 
-        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(response.content)
+        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(response)
 
         headers.update(post_headers)
         
         data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={self.startyearlist}&semesterlist={self.semesterlist}&Interestlist2={self.interestlist2}&CourseNumTextbox=&Button1=Search'
         response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
-        
+        self.schedule_response = response
+
         for key in post_headers:
             headers.pop(key)
-    
-        self.schedule_html = BeautifulSoup(response.content, 'html.parser')
-        
 
+        self.courses = []
+        schedule_soup = BeautifulSoup(response.content, 'lxml', from_encoding="utf8")
+        rows = schedule_soup.find("table").find_all("tr")
+        for row in rows:
+            if len(row.find_all('td')) >= 1:
+                for linebreak in row.find_all("br"):
+                    linebreak.replace_with(" and ")
+                self.courses.append(Course(row))
+    
     def get_csv(self, file_directory=""):
-        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(str(self.schedule_html))
+        """
+        Returns csv.reader object with schedule data and saves csv to the file_directory passed in.
+        """
+
+        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(self.schedule_response)
         data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&Button1=+Export+to+Excel+%28CSV%29'
 
         headers.update(post_headers)
@@ -165,6 +198,6 @@ class CNUSchedule:
         with open(os.path.join(file_directory, "schedule.csv"), "wb") as file:
             for chunk in response:
                 file.write(chunk)
+            csv_reader = csv.reader(file)
 
-        csv_reader = csv.reader(file)
         return csv_reader

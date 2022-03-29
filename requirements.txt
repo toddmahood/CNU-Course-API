@@ -1,0 +1,6 @@
+requests
+lxml
+cchardet
+urllib3
+beautifulsoup4
+RateMyProfessorAPI
