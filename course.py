@@ -41,4 +41,7 @@ class Course():
             self.instructor_difficulty = None
             self.instructor_num_ratings = None
             self.instructor_would_take_again = "N/A"
+
+    def __str__(self):
+        return f"CRN: {self.crn}, Course: {self.course_name}, Section: {self.section}, Title: {self.title}, Hours: {self.hours}, Area of LLC: {self.area_of_llc}, Type: {self.course_type}, Days: {self.days}, Time: {self.time}, Location: {self.location}, Instructor: {self.instructor}, Seats Available: {self.seats_available}, Status: {self.status}"
             
