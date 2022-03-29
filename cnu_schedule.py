@@ -1,10 +1,11 @@
 import requests
 import urllib.parse
-from bs4 import BeautifulSoup
 import os
-import course
 import time
 import csv
+from bs4 import BeautifulSoup
+from course import Course
+
 
 # Define headers for our requests.
 headers = {
@@ -32,6 +33,8 @@ post_headers = {
 class CNUSchedule:
 
     def get_dynamic_params(self, html):
+        '''
+        '''
         # Find post fields and parse them
         soup = BeautifulSoup(html.content, 'html.parser')
         viewstate = urllib.parse.quote(soup.find(id="__VIEWSTATE")["value"], safe='')
@@ -108,35 +111,38 @@ class CNUSchedule:
 
         # Can possibly add these in init header
         interestlist2 = "Any" # Liberal Learning Core, Honors Program or Writing Intensive Course selection
-        # disciplineslistbox = "All+Courses" # Subject selection (not required)
+        disciplineslistbox = "All+Courses" # Subject selection (not required)
         headers.update(post_headers)
         
         data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={startyearlist}&semesterlist={semesterlist}&Interestlist2={interestlist2}&CourseNumTextbox=&Button1=Search'
         response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
         if response.status_code == 500:
-            raise ValueError("Bad Request, make sure the provided semester exists. If it does, check POST headers.")
+            raise ValueError("Bad Request, make sure the provided semester exists. If it does, check to see if the POST payload or headers have changed.")
 
         for key in post_headers:
             headers.pop(key)
-
-        # Stop here if you just want schedule html
-        # print("Successfully grabbed schedule html.")
-        with open("schedule.html", "w+", encoding='UTF-8') as file:
-            file.write(response.text)
         
-        self.interestlist2 = "Any" # Liberal Learning Core, Honors Program or Writing Intensive Course selection
-        self.disciplineslistbox = "All+Courses" # Subject selection (not required)
+        self.interestlist2 = interestlist2
+        self.disciplineslistbox = disciplineslistbox
         self.semesterlist = semesterlist
         self.startyearlist = startyearlist
-        self.schedule = BeautifulSoup(response.content, 'html.parser')
+        self.schedule_html = BeautifulSoup(response.content, 'html.parser')
+        self.courses = []
+        rows = self.schedule_html.find("table").find_all("tr")
+        for row in rows:
+            # A little pre processing to remove the linebreaks and replace them with and.
+            for linebreak in row.find_all("br"):
+                linebreak.replace_with(" and ")
+            self.courses.append(Course(row))
         
-    def search(self, crn=None):
+
+    def search(self, crn=None, course_name=None, ):
         return None
     
     def update(self):
         response = self.session.get('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers)
 
-        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(response)
+        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(response.content)
 
         headers.update(post_headers)
         
@@ -146,11 +152,11 @@ class CNUSchedule:
         for key in post_headers:
             headers.pop(key)
     
-        self.schedule = BeautifulSoup(response.content, 'html.parser')
+        self.schedule_html = BeautifulSoup(response.content, 'html.parser')
         
 
     def get_csv(self, file_directory=""):
-        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(str(self.schedule))
+        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(str(self.schedule_html))
         data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&Button1=+Export+to+Excel+%28CSV%29'
 
         headers.update(post_headers)
