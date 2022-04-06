@@ -117,6 +117,7 @@ class CNUSchedule:
 
         headers.update(post_headers) # Add POST headers to existing header dictionary.
 
+        # This intermediary request is not necessary for querying classes in the default term. However, once you try to request classes of a specific subject for a non default semester this request becomes necessary.
         data = f'__EVENTTARGET=semesterlist&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={startyearlist}&semesterlist={semesterlist}&Interestlist2=Any&CourseNumTextbox='
         response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
         if response.status_code == 500:
@@ -124,6 +125,7 @@ class CNUSchedule:
         
         soup = BeautifulSoup(response.content, 'lxml', from_encoding="utf8")
 
+        # Don't use dynamic parameter method because we need additional items from this request and there is no point in creating two identical BeautifulSoup objects.
         viewstate = urllib.parse.quote(soup.find(id="__VIEWSTATE")["value"], safe='')
         viewstate_generator = urllib.parse.quote(soup.find(id="__VIEWSTATEGENERATOR")["value"], safe='')
         event_validation = urllib.parse.quote(soup.find(id="__EVENTVALIDATION")["value"], safe='')
@@ -133,6 +135,7 @@ class CNUSchedule:
         interest_list = [option.get("value") for option in interest_options]
         discipline_list = [option.get("value") for option in discipline_options]
 
+        # Sanity checks / some input data validation
         if interest != "Any" and (discipline != "All Courses" or course_num != ""):
             raise ValueError(f"Cannot pass interest and discipline or course_num arguments at the same time.")
 
@@ -150,11 +153,11 @@ class CNUSchedule:
                 raise ValueError(f"Invalid course_num argument, please try again. Examples of valid arguments include: 201, 150, 327, 214")
 
         if interest != "Any":
-            interestlist2 = interest.strip().upper() # Liberal Learning Core, Honors Program or Writing Intensive Course selection
+            interestlist2 = interest.strip().upper() 
             disciplineslistbox = ""
         else:
             interestlist2 = interest
-            disciplineslistbox = "&DisciplinesListBox=" + discipline.strip().replace(" ", "+") # Subject selection (not required), case-sensitive.
+            disciplineslistbox = "&DisciplinesListBox=" + discipline.strip().replace(" ", "+") 
         
         
         data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={startyearlist}&semesterlist={semesterlist}&Interestlist2={interestlist2}{disciplineslistbox}&CourseNumTextbox={course_num}&Button1=Search'
@@ -168,12 +171,12 @@ class CNUSchedule:
         for key in post_headers:
             headers.pop(key)
         
-        self.startyearlist = startyearlist
-        self.semesterlist = semesterlist
-        self.interestlist2 = interestlist2
-        self.disciplineslistbox = disciplineslistbox
-        self.query_course_num = course_num
-        self.schedule_response = response
+        self.__startyearlist = startyearlist
+        self.__semesterlist = semesterlist
+        self.__interestlist2 = interestlist2
+        self.__disciplineslistbox = disciplineslistbox
+        self.__query_course_num = course_num
+        self.__schedule_response = response
 
         # end = time.time()
         # time_elapsed = end - start
@@ -194,7 +197,7 @@ class CNUSchedule:
                         linebreak.replace_with(" and ")
                     self.courses.append(Course(row))
         
-    def search(self, crn=None, course_name=None, course_title=None):
+    def search(self):
         """
         Pending implementation?
         """
@@ -204,14 +207,14 @@ class CNUSchedule:
         """
         Update schedule. Will assume the search parameters passed into constructor. Could potentially make this a Course method.
         """
-        # Reload schedule starting from original search page, this is because cookies may expire before we want to update course schedule.
+        # Reload schedule starting from original search page, this is because cookies/session may expire before we want to update course schedule.
         response = self.session.get('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers)
-
         viewstate, viewstate_generator, event_validation = self.get_dynamic_params(response)
 
         headers.update(post_headers)
+        # Probably need to add the intermediary semester selection request here as well, I am assuming it works without because I tested right after the creation of the object and the session would still be valid.
         
-        data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={self.startyearlist}&semesterlist={self.semesterlist}&Interestlist2={self.interestlist2}{self.disciplineslistbox}&CourseNumTextbox={self.query_course_num}&Button1=Search'
+        data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={self.__startyearlist}&semesterlist={self.__semesterlist}&Interestlist2={self.__interestlist2}{self.__disciplineslistbox}&CourseNumTextbox={self.__query_course_num}&Button1=Search'
         response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
         self.schedule_response = response
 
@@ -233,7 +236,7 @@ class CNUSchedule:
         Returns csv.reader object with schedule data and saves csv to the file_directory passed in.
         """
 
-        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(self.schedule_response)
+        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(self.__schedule_response)
         data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&Button1=+Export+to+Excel+%28CSV%29'
 
         headers.update(post_headers)
