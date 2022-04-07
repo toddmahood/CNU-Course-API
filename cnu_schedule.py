@@ -212,8 +212,11 @@ class CNUSchedule:
         viewstate, viewstate_generator, event_validation = self.get_dynamic_params(response)
 
         headers.update(post_headers)
-        # Probably need to add the intermediary semester selection request here as well, I am assuming it works without because I tested right after the creation of the object and the session would still be valid.
         
+        data = f'__EVENTTARGET=semesterlist&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={self.__startyearlist}&semesterlist={self.__semesterlist}&Interestlist2=Any&CourseNumTextbox='
+        response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
+        viewstate, viewstate_generator, event_validation = self.get_dynamic_params(response)
+
         data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={self.__startyearlist}&semesterlist={self.__semesterlist}&Interestlist2={self.__interestlist2}{self.__disciplineslistbox}&CourseNumTextbox={self.__query_course_num}&Button1=Search'
         response = self.session.post('https://navigator.cnu.edu/StudentScheduleofClasses/', headers=headers, data=data)
         self.schedule_response = response

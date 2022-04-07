@@ -15,7 +15,7 @@ if __name__ == "__main__":
     csv_reader_obj = schedule.get_csv()
     # Print("CSV object returned and saved.")
     schedule.update()
-    # print("Updated.")
-    # for course in schedule.courses:
-        # print(course)
+    print("Updated.")
+    for course in schedule.courses:
+        print(course)
     
