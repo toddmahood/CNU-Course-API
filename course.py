@@ -1,6 +1,7 @@
 import ratemyprofessor
 
 # Get our school object upon import so that we don't have to load it every time a professor rating is queried.
+# Check out RateMyProfessorAPI @ https://github.com/Nobelz/RateMyProfessorAPI
 school = ratemyprofessor.get_school_by_name("Christopher Newport University")
 
 class Course():
@@ -13,18 +14,18 @@ class Course():
         # get relevant column text and strip whitespace.
         cols = [col.text.strip() for index, col in enumerate(cols) if index != 5]
         # This assigns column data to course attributes. Doesn't currently do anything for columns with no value will simply assign empty string.
-        self.crn = cols[0]
-        self.course_name = cols[1]
+        self.crn = int(cols[0])
+        self.name = cols[1]
         self.section = cols[2]
         self.title = cols[3]
-        self.hours = cols[4]
+        self.hours = int(cols[4])
         self.area_of_llc = cols[5]
         self.course_type = cols[6]
         self.days = cols[7]
         self.time = cols[8]
         self.location = cols[9]
         self.instructor	= cols[10]
-        self.seats_available = cols[11]
+        self.seats_available = int(cols[11])
         self.status = cols[12]
             
     def get_professor_rating(self):
