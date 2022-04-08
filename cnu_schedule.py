@@ -142,8 +142,15 @@ class CNUSchedule:
         if interest.strip().upper() not in interest_list and interest != "Any":
             raise ValueError(f"Invalid interest argument, please try again. Examples of valid arguments include: {interest_list}")
 
-        if discipline not in discipline_list:
-            raise ValueError(f"Invalid discipline argument, please try again. Examples of valid arguments include: {discipline_list}")
+        # To accommodate and check multiple disciplines.
+        if type(discipline) == str:
+            if discipline not in discipline_list:
+                raise ValueError(f"Invalid discipline argument, please try again. Examples of valid arguments include: {discipline_list}")
+        else:
+            for x in discipline:
+                if x not in discipline_list:
+                    raise ValueError(f"Invalid discipline argument: {x}, please try again. Examples of valid arguments include: {discipline_list}")
+
 
         if course_num != "":
             try:
@@ -157,7 +164,12 @@ class CNUSchedule:
             disciplineslistbox = ""
         else:
             interestlist2 = interest
-            disciplineslistbox = "&DisciplinesListBox=" + discipline.strip().replace(" ", "+") 
+            if type(discipline) == str:
+                disciplineslistbox = "&DisciplinesListBox=" + discipline.strip().replace(" ", "+") 
+            else:
+                disciplineslistbox = ""
+                for x in discipline:
+                    disciplineslistbox += "&DisciplinesListBox=" + x.strip().replace(" ", "+")
         
         
         data = f'__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE={viewstate}&__VIEWSTATEGENERATOR={viewstate_generator}&__EVENTVALIDATION={event_validation}&startyearlist={startyearlist}&semesterlist={semesterlist}&Interestlist2={interestlist2}{disciplineslistbox}&CourseNumTextbox={course_num}&Button1=Search'

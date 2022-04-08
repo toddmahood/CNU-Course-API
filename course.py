@@ -4,6 +4,24 @@ import ratemyprofessor
 # Check out RateMyProfessorAPI @ https://github.com/Nobelz/RateMyProfessorAPI
 school = ratemyprofessor.get_school_by_name("Christopher Newport University")
 
+class Meeting():
+    def __init__(self, days, time, location):
+        """
+        Store meeting attributes.
+        """
+        # Stores -1 for start and end time if there is none provided.
+        self.days = [day for day in days]
+        if time == "":
+            self.start_time = -1
+            self.end_time = -1
+        else:
+            self.start_time = int(time.split("-")[0])
+            self.end_time = int(time.split("-")[1])
+        self.location = location
+
+    def __str__(self):
+        return f"Days: {self.days}, Start Time: {self.start_time}, End Time: {self.end_time}, Location: {self.location}"
+
 class Course():
     def __init__(self, row):
         """
@@ -15,28 +33,40 @@ class Course():
         cols = [col.text.strip() for index, col in enumerate(cols) if index != 5]
         # This assigns column data to course attributes. Doesn't currently do anything for columns with no value will simply assign empty string.
         self.crn = int(cols[0])
-        self.name = cols[1]
+        self.course = cols[1]
         self.section = cols[2]
         self.title = cols[3]
-        self.hours = int(cols[4])
-        self.area_of_llc = cols[5]
-        self.course_type = cols[6]
-        self.days = cols[7]
-        self.time = cols[8]
-        self.location = cols[9]
-        self.instructor	= cols[10]
-        self.seats_available = int(cols[11])
-        self.status = cols[12]
-            
-    def get_professor_rating(self):
+        # self.hours = int(cols[4])
+        hours = cols[4].split("-")
+        if len(hours) > 1:
+            self.min_hours = int(hours[0]) # min hours
+            self.max_hours = int(hours[1]) # max hours
+        else:
+            self.min_hours = int(hours[0])
+            self.max_hours = int(hours[0])
+        self.area_llc = cols[5].split(" ") # List of interests
+        self.type = cols[6] 
+
+        # Not sure if this will work every time.
+        self.meeting = []
+        day_lines = cols[7].split(" and ") 
+        time_lines = cols[8].split(" and ")
+        location_lines = cols[9].split(" and ") # I am assuming that every time there are locations listed on two lines there will be multiple start, end, and times.
+        for index, location in enumerate(location_lines):
+            self.meeting.append(Meeting(day_lines[index], time_lines[index], location))
+        self.instructors = cols[10].split(" and ")
+        self.seats_still_available = int(cols[11]) 
+        self.open = (cols[12] == "Open") 
+        
+    def get_professor_ratings(self):
         """
         Returns list of tuples containing professor rating statistics from ratemyprofessor.com
         """
         # List approach was taken because there could be multiple professors listed. 
         ratings = []
-        for instructor in self.instructor.split(" and "):
-            professor = ratemyprofessor.get_professor_by_school_and_name(school, self.instructor)
-            if self.instructor != "Staff, CNU" and professor is not None:
+        for instructor in self.instructors:
+            professor = ratemyprofessor.get_professor_by_school_and_name(school, instructor)
+            if instructor != "Staff, CNU" and professor is not None:
                 if professor.would_take_again is not None:
                     would_take_again = str(round(professor.would_take_again, 1)) + '%'
                 else:
@@ -45,7 +75,7 @@ class Course():
         return ratings
 
     def __str__(self):
-        return f"CRN: {self.crn}, Course: {self.name}, Section: {self.section}, Title: {self.title}, Hours: {self.hours}, Area of LLC: {self.area_of_llc}, Type: {self.course_type}, Days: {self.days}, Time: {self.time}, Location: {self.location}, Instructor: {self.instructor}, Seats Available: {self.seats_available}, Status: {self.status}"
+        return f"CRN: {self.crn}, Course: {self.course}, Section: {self.section}, Title: {self.title}, Minimum Hours: {self.min_hours}, Maximum Hours: {self.max_hours}, Area(s) of LLC: {self.area_llc}, Type: {self.type}, Meeting Information: {[str(meeting) for meeting in self.meeting]}, Instructor(s): {self.instructors}, Seats Available: {self.seats_still_available}, Open: {self.open}"
 
     def __eq__(self, other):
         """

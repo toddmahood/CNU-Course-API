@@ -3,12 +3,13 @@ import time
 
 if __name__ == "__main__":
     # start = time.time()
-    schedule = CNUSchedule("Summer term 1 2022", discipline="Computer Science")
+    schedule = CNUSchedule("Fall 2022", discipline="Computer Science")
+    print(len(schedule.courses))
     for course in schedule.courses:
         # if course.crn == '9298':
         print(course)
-        ratings = course.get_professor_rating()
-        print(f"Professor Rating Stats: {ratings}")
+        # ratings = course.get_professor_ratings()
+        # print(f"Professor(s) Rating Stats: {ratings}")
         # end = time.time()
         # time_elapsed = end - start
         # print(f"Parsed and found class in {time_elapsed} seconds.")
